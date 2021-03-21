@@ -1,22 +1,45 @@
 package handler
 
 import (
-	"net"
+	"github.com/beleege/gosrt/core/session"
+	"github.com/beleege/gosrt/util/log"
 )
 
-type SRTHandler interface {
+var Queue = make(chan *session.SRTSession)
+
+type srtHandler interface {
 	hasNext() bool
-	next(h SRTHandler)
-	In(s net.PacketConn, b []byte) error
-	Out(s net.PacketConn, a net.Addr, b []byte) error
+	next(h srtHandler)
+	execute(s *session.SRTSession) error
 }
 
-func Warp(handlers ...SRTHandler) SRTHandler {
-	head := handlers[len(handlers)-1]
-	next := head
-	for i := len(handlers) - 2; i >= 0; i-- {
-		next.next(handlers[i])
-		next = handlers[i]
+func Task() {
+	defer close(Queue)
+	chain := wrap()
+
+	for s := range Queue {
+		go doWork(chain, s)
 	}
-	return head
+}
+
+func doWork(h srtHandler, s *session.SRTSession) {
+	if err := h.execute(s); err != nil {
+		log.Error("handle session fail: %s", err.Error())
+	}
+}
+
+func wrap() srtHandler {
+	handlers := selectHandlers()
+	for i := len(handlers) - 2; i >= 0; i-- {
+		handlers[i].next(handlers[i+1])
+	}
+	return handlers[0]
+}
+
+func selectHandlers() []srtHandler {
+	list := make([]srtHandler, 0, 3)
+	list = append(list, NewValidator())
+	list = append(list, NewDecoder())
+	list = append(list, NewGreeter())
+	return list
 }

@@ -1,6 +1,7 @@
 package selector
 
 import (
+	"github.com/beleege/gosrt/core/handler"
 	"net"
 
 	"github.com/beleege/gosrt/core/session"
@@ -28,23 +29,14 @@ func Select(c net.PacketConn) {
 
 			s, ok := h.sessions[client]
 			if !ok {
-				s = session.NewSRTSession(c, from)
+				s = session.NewSRTSession(c, from, buf[:n])
 				h.sessions[client] = s
 			}
 
-			go work(s, buf[:n])
+			handler.Queue <- s
 		} else {
 			//l.notifyReadError(errors.WithStack(err))
 			return
 		}
-	}
-}
-
-func work(s *session.SRTSession, b []byte) {
-	if _, err := s.Read(b); err != nil {
-		log.Error("read data fail: %s", err.Error())
-	}
-	if _, err := s.Write(b); err != nil {
-		log.Error("write data fail: %s", err.Error())
 	}
 }
