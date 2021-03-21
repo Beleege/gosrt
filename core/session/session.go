@@ -39,7 +39,7 @@ type SRTSession struct {
 	StreamID string
 	TSBPD    *srt.HSExtTSBPD
 	// TODO condition compete
-	Status uint8
+	Status uint32
 }
 
 func (s *SRTSession) Write(b []byte) (n int, err error) {
