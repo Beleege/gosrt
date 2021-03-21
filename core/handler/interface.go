@@ -18,7 +18,7 @@ func Task() {
 	chain := wrap()
 
 	for s := range Queue {
-		go doWork(chain, s)
+		doWork(chain, s)
 	}
 }
 
