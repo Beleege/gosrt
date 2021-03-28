@@ -1,7 +1,9 @@
 package srt
 
 import (
+	"bytes"
 	"encoding/binary"
+	"time"
 )
 
 const ()
@@ -61,11 +63,11 @@ type DataPacket struct {
 	Packet
 	SequenceNum uint32 // The sequential number of the data packet
 	PP          uint8  // This field indicates the position of the data packet in the message: (10b) first, (00b) middle, (01b) last, (11b) whole
-	O           uint8  // Order Flag. Indicates whether the message should be delivered by the receiver in order (1) or not (0)
+	O           bool   // Order Flag. Indicates whether the message should be delivered by the receiver in order (1) or not (0)
 	KK          uint8  // Key-based Encryption Flag: (00b) not encrypted, (01b) encrypted with even key, (10b) odd key encryption, (11b) for control packet use
-	R           uint8  // Retransmitted Packet Flag: (0b) first, (1b) retransmitted
-	MsgNum      uint8  // The sequential number of consecutive data packets that form a message (see PP field)
-	data        []byte // The payload of the data packet
+	R           bool   // Retransmitted Packet Flag: (0b) first, (1b) retransmitted
+	MsgNum      uint32 // The sequential number of consecutive data packets that form a message (see PP field)
+	Content     []byte // The payload of the data packet
 }
 
 // Control packet structure
@@ -90,6 +92,34 @@ type ControlPacket struct {
 	Subtype  uint16 // This field specifies an additional subtype for specific packets
 	SpecInfo []byte // The use of this field depends on the particular control packet type
 	CIF      []byte // The use of this field is defined by the Control Type field of the control packet
+}
+
+func (cp *ControlPacket) header(t *time.Time, info uint32, sid uint32) *bytes.Buffer {
+	buf := bytes.NewBuffer([]byte{})
+	_ = binary.Write(buf, binary.BigEndian, cp.CType|0x8000)
+	_ = binary.Write(buf, binary.BigEndian, cp.Subtype)
+	_ = binary.Write(buf, binary.BigEndian, info)
+	_ = binary.Write(buf, binary.BigEndian, uint32(time.Now().UnixNano()-t.UnixNano()))
+	_ = binary.Write(buf, binary.BigEndian, sid)
+	return buf
+}
+
+func (cp *ControlPacket) Ack(no, sid, seq, rtt, rttDiff, leftMFW, pRate, bandwidth, rRate uint32, t *time.Time) []byte {
+	buf := cp.header(t, no, sid)
+	_ = binary.Write(buf, binary.BigEndian, seq)
+	_ = binary.Write(buf, binary.BigEndian, rtt)
+	_ = binary.Write(buf, binary.BigEndian, rttDiff)
+	_ = binary.Write(buf, binary.BigEndian, leftMFW)
+	_ = binary.Write(buf, binary.BigEndian, pRate)
+	_ = binary.Write(buf, binary.BigEndian, bandwidth)
+	_ = binary.Write(buf, binary.BigEndian, rRate)
+	return buf.Bytes()
+}
+
+func (cp *ControlPacket) Shutdown(t *time.Time, sid uint32) []byte {
+	buf := cp.header(t, uint32(0), sid)
+	_ = binary.Write(buf, binary.BigEndian, uint32(0))
+	return buf.Bytes()
 }
 
 // CIF of HandShake
@@ -157,10 +187,11 @@ type HSExtension struct {
 // |      Receiver TSBPD Delay     |       Sender TSBPD Delay      |
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 type HSExtTSBPD struct {
+	Bytes      []byte
 	SRTVersion uint32 // SRT library version
 	SRTFlags   uint32 // SRT configuration flags
-	ThisDelay  uint16 // Delay of the sender
-	ThatDelay  uint16 // Delay of the peer
+	TxDelay    uint16 // Delay of the Receiver
+	RxDelay    uint16 // Delay of the Sender
 }
 
 // SRT Extension (Stream ID)
@@ -168,10 +199,27 @@ type HSExtStreamID struct {
 	StreamID string
 }
 
+func ParseDPacket(b []byte) *DataPacket {
+	p := new(DataPacket)
+	p.SequenceNum = binary.BigEndian.Uint32(b[:4])
+	p.PP = (b[4] & 0xC0) >> 6
+	p.O = (b[4] & 0x20) > 0
+	p.KK = (b[4] & 0x18) >> 3
+	p.R = (b[4] & 0x04) > 0
+	mn := make([]byte, 0, 4)
+	mn = append(mn, b[4]&0x11, b[5], b[6], b[7])
+	p.MsgNum = binary.BigEndian.Uint32(mn)
+	p.Timestamp = binary.BigEndian.Uint32(b[8:12])
+	p.SocketID = binary.BigEndian.Uint32(b[12:16])
+	p.Content = b[16:]
+	return p
+}
+
 func ParseCPacket(b []byte) *ControlPacket {
-	b[0] = b[0] & 0x7F
+	ct := make([]byte, 0, 2)
+	ct = append(ct, b[0]&0x7F, b[1])
 	p := new(ControlPacket)
-	p.CType = binary.BigEndian.Uint16(b[:2])
+	p.CType = binary.BigEndian.Uint16(ct)
 	p.Subtype = binary.BigEndian.Uint16(b[2:4])
 	p.SpecInfo = b[4:8]
 	p.Timestamp = binary.BigEndian.Uint32(b[8:12])
@@ -200,9 +248,10 @@ func ParseHCIF(b []byte) *HandShakeCIF {
 
 func ParseHExtension(b []byte) *HSExtTSBPD {
 	h := new(HSExtTSBPD)
+	h.Bytes = b
 	h.SRTVersion = binary.BigEndian.Uint32(b[:4])
 	h.SRTFlags = binary.BigEndian.Uint32(b[4:8])
-	h.ThatDelay = binary.BigEndian.Uint16(b[8:10])
-	h.ThisDelay = binary.BigEndian.Uint16(b[10:12])
+	h.TxDelay = binary.BigEndian.Uint16(b[8:10])
+	h.RxDelay = binary.BigEndian.Uint16(b[10:12])
 	return h
 }

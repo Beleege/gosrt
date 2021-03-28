@@ -1,10 +1,10 @@
 package server
 
 import (
-	"github.com/beleege/gosrt/core/handler"
 	"net"
 
 	"github.com/beleege/gosrt/config"
+	"github.com/beleege/gosrt/core/handler"
 	"github.com/beleege/gosrt/core/selector"
 	"github.com/beleege/gosrt/util/log"
 	"github.com/pkg/errors"
@@ -15,7 +15,7 @@ func SetupUDPServer() {
 	if err != nil {
 		panic(errors.WithStack(err))
 	}
-	log.Info("udp server start at %s", config.GetUDPAddr())
+	log.Infof("udp server start at %s", config.GetUDPAddr())
 
 	conn, err := net.ListenUDP("udp", addr)
 	if err != nil {
@@ -23,7 +23,7 @@ func SetupUDPServer() {
 	}
 	defer func() {
 		_ = conn.Close()
-		log.Info("udp server shutdown")
+		log.Infof("udp server shutdown")
 	}()
 
 	go handler.Task()

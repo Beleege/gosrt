@@ -43,7 +43,7 @@ func serverInit() {
 func main() {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Error("srt server panic: ", r)
+			log.Errorf("srt server panic: ", r)
 			time.Sleep(1 * time.Second)
 		}
 	}()

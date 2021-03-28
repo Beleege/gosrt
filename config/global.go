@@ -15,6 +15,12 @@ var params = struct {
 		IP   string `default:"127.0.0.1"`
 		Port int    `default:"9090"`
 	}
+	SRT struct {
+		Latency struct {
+			TX uint16 `default:"20"`
+			RX uint16 `default:"20"`
+		}
+	}
 }{}
 
 func InitConfig() {
@@ -33,4 +39,12 @@ func GetLogLevel() string {
 
 func GetUDPAddr() string {
 	return fmt.Sprintf("%s:%d", params.UDP.IP, params.UDP.Port)
+}
+
+func GetTx() uint16 {
+	return params.SRT.Latency.TX
+}
+
+func GetRx() uint16 {
+	return params.SRT.Latency.RX
 }

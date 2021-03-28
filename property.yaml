@@ -2,3 +2,8 @@ loglevel: debug
 udp:
   ip: 127.0.0.1
   port: 9090
+
+srt:
+  latency:
+    tx: 20
+    rx: 20

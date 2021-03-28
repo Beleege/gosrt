@@ -2,6 +2,8 @@ package session
 
 import (
 	"encoding/binary"
+	"github.com/beleege/gosrt/util/log"
+	"math/rand"
 	"net"
 	"strconv"
 	"strings"
@@ -21,8 +23,13 @@ const (
 )
 
 type SRTSession struct {
-	conn net.PacketConn
-	peer net.Addr
+	conn     net.PacketConn
+	peer     net.Addr
+	OpenTime time.Time
+	ACKNo    uint32
+	ACKTime  uint32
+	RTTTime  uint32
+	RTTDiff  uint32
 
 	CP   *srt.ControlPacket
 	DP   *srt.DataPacket
@@ -33,8 +40,6 @@ type SRTSession struct {
 	MFW      uint32
 	ThisSID  uint32
 	ThatSID  uint32
-	ThisTime uint32
-	ThatTime uint32
 	Cookie   uint32
 	StreamID string
 	TSBPD    *srt.HSExtTSBPD
@@ -51,12 +56,19 @@ func NewSRTSession(c net.PacketConn, a net.Addr, b []byte) *SRTSession {
 	s.conn = c
 	s.peer = a
 	s.Data = b
-	s.ThisTime = uint32(time.Now().Nanosecond() / 1000000)
+	s.OpenTime = time.Now()
+	s.ThisSID = rand.New(rand.NewSource(s.OpenTime.UnixNano())).Uint32()
+	s.Status = SNew
 	return s
 }
 
-func (s *SRTSession) SetCP(p *srt.ControlPacket, cif *srt.HandShakeCIF) {
-	s.CP = p
+func (s *SRTSession) SetDP(pkg *srt.DataPacket) {
+	s.DP = pkg
+	s.SendNo = pkg.SequenceNum
+}
+
+func (s *SRTSession) SetCP(pkg *srt.ControlPacket, cif *srt.HandShakeCIF) {
+	s.CP = pkg
 	s.parseHSExtension(cif.HSExt)
 	if cif.Version == srt.HSv4 {
 		s.SendNo = cif.InitSequenceNum
@@ -68,11 +80,13 @@ func (s *SRTSession) SetCP(p *srt.ControlPacket, cif *srt.HandShakeCIF) {
 		}
 	} else if cif.Version == srt.HSv5 {
 		if cif.Cookie != s.Cookie {
+			log.Errorf("cookie[%d] is not match", cif.Cookie)
 			s.Status = SIllegal
 			return
 		}
-		if cif.HType == srt.HSTypeInduction {
+		if cif.HType == srt.HSTypeConclusion {
 			s.Status = SRepeat
+			s.ACKTime = uint32(time.Now().Unix())
 		}
 	}
 }
@@ -106,7 +120,6 @@ func parseMultiExt(b []byte) []*srt.HSExtension {
 	idx := 0
 	size := len(b)
 	for idx < size {
-		idx = 0
 		hse := new(srt.HSExtension)
 
 		hse.EType = binary.BigEndian.Uint16(b[idx : idx+2])
@@ -135,4 +148,8 @@ func (s *SRTSession) GetPeerIPv4() (*[4]byte, error) {
 		bytes[i] = byte(n)
 	}
 	return bytes, nil
+}
+
+func (s *SRTSession) GetPeer() string {
+	return s.peer.String()
 }

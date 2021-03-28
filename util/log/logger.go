@@ -14,7 +14,7 @@ func InitLog() {
 	if err != nil {
 		panic(err)
 	}
-	formatter := logger.JSONFormatter{TimestampFormat: "2006-01-02 15:04:05.999"}
+	formatter := logger.TextFormatter{FullTimestamp: true, TimestampFormat: "2006-01-02 15:04:05.999"}
 	l = &logger.Logger{
 		Out:       os.Stdout,
 		Formatter: &formatter,
@@ -23,14 +23,14 @@ func InitLog() {
 	}
 }
 
-func Info(s string, args ...interface{}) {
+func Infof(s string, args ...interface{}) {
 	l.Infof(s, args...)
 }
 
-func Debug(s string, args ...interface{}) {
+func Debugf(s string, args ...interface{}) {
 	l.Debugf(s, args...)
 }
 
-func Error(s string, args ...interface{}) {
+func Errorf(s string, args ...interface{}) {
 	l.Errorf(s, args...)
 }
