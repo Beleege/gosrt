@@ -1,14 +1,19 @@
 package handler
 
 import (
+	"strconv"
 	"time"
 
+	"github.com/beleege/gosrt/config"
 	"github.com/beleege/gosrt/core/session"
 	"github.com/beleege/gosrt/protocol/srt"
 	"github.com/beleege/gosrt/util/log"
+	"github.com/beleege/gosrt/util/pool"
 )
 
 var Queue = make(chan *session.SRTSession)
+
+var taskPool *pool.Pool
 
 type srtHandler interface {
 	hasNext() bool
@@ -16,18 +21,36 @@ type srtHandler interface {
 	execute(s *session.SRTSession) error
 }
 
-func Task() {
-	chain := wrap()
+type srtContext struct {
+	h srtHandler
+	s *session.SRTSession
+}
 
-	for s := range Queue {
-		doWork(chain, s)
+func (c *srtContext) GetID() string {
+	return strconv.Itoa(int(c.s.ThatSID))
+}
+
+func (c *srtContext) GetTask() pool.Task {
+	return func(args ...interface{}) error {
+		if err := c.h.execute(c.s); err != nil {
+			log.Errorf("handle session fail: %s", err.Error())
+			closeConnect(c.s)
+		}
+		return nil
 	}
 }
 
-func doWork(h srtHandler, s *session.SRTSession) {
-	if err := h.execute(s); err != nil {
-		log.Errorf("handle session fail: %s", err.Error())
-		closeConnect(s)
+func Task() {
+	taskPool = pool.NewFixedSizePool(config.GetPoolSize())
+	defer taskPool.Clear()
+
+	chain := wrap()
+	for s := range Queue {
+		ctx := &srtContext{h: chain, s: s}
+		if err := taskPool.Execute(ctx); err != nil {
+			log.Errorf("task execute fail: %s", err.Error())
+			taskPool.Remove(ctx.GetID())
+		}
 	}
 }
 

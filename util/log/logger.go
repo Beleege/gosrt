@@ -1,9 +1,9 @@
 package log
 
 import (
-	"github.com/beleege/gosrt/config"
 	"os"
 
+	"github.com/beleege/gosrt/config"
 	logger "github.com/sirupsen/logrus"
 )
 

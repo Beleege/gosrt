@@ -2,7 +2,6 @@ package session
 
 import (
 	"encoding/binary"
-	"github.com/beleege/gosrt/util/log"
 	"math/rand"
 	"net"
 	"strconv"
@@ -10,6 +9,7 @@ import (
 	"time"
 
 	"github.com/beleege/gosrt/protocol/srt"
+	"github.com/beleege/gosrt/util/log"
 )
 
 const (

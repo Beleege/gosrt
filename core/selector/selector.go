@@ -1,10 +1,10 @@
 package selector
 
 import (
-	"github.com/beleege/gosrt/core/handler"
 	"net"
 	"sync"
 
+	"github.com/beleege/gosrt/core/handler"
 	"github.com/beleege/gosrt/core/session"
 	"github.com/beleege/gosrt/util/log"
 )

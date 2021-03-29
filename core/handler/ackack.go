@@ -2,11 +2,12 @@ package handler
 
 import (
 	"encoding/binary"
+	"time"
+
 	"github.com/beleege/gosrt/core/session"
 	"github.com/beleege/gosrt/protocol/srt"
 	"github.com/beleege/gosrt/util/log"
 	"github.com/pkg/errors"
-	"time"
 )
 
 type ackack struct {
