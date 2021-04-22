@@ -1,12 +1,11 @@
 package handler
 
 import (
-	"github.com/beleege/gosrt/core/session"
 	"github.com/pkg/errors"
 )
 
 const (
-	_maxPacketBytes = 1500
+	_maxPacketBytes = 1400
 )
 
 type validator struct {
@@ -26,11 +25,11 @@ func (v *validator) next(next srtHandler) {
 	v.nextHandler = next
 }
 
-func (v *validator) execute(s *session.SRTSession) error {
-	if size := len(s.Data); size > _maxPacketBytes {
-		return errors.Errorf("package size[%d] is illegal", len(s.Data))
+func (v *validator) execute(box *Box) error {
+	if size := len(box.b); size > _maxPacketBytes {
+		return errors.Errorf("package size[%d] is illegal", len(box.b))
 	} else if v.hasNext() {
-		return v.nextHandler.execute(s)
+		return v.nextHandler.execute(box)
 	}
 	return errors.New("no handler after validator")
 }

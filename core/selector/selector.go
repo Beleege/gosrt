@@ -1,8 +1,8 @@
 package selector
 
 import (
+	"encoding/binary"
 	"net"
-	"sync"
 
 	"github.com/beleege/gosrt/core/handler"
 	"github.com/beleege/gosrt/core/session"
@@ -10,39 +10,35 @@ import (
 )
 
 const (
-	_mtuLimit = 1500
+	_mtuLimit = 1400
 )
 
 type holder struct {
-	sessions *sync.Map
+	sessions map[string]*session.SRTSession
 }
 
-func Select(c net.PacketConn) {
+func Select(conn net.PacketConn) {
 	h := new(holder)
-	h.sessions = &sync.Map{}
-
-	buf := make([]byte, _mtuLimit)
+	h.sessions = make(map[string]*session.SRTSession)
 
 	defer func() {
-		defer close(handler.Queue)
+		close(handler.Queue)
 	}()
 
 	for {
-		if n, from, err := c.ReadFrom(buf); err == nil {
+		buf := make([]byte, _mtuLimit)
+		if n, from, err := conn.ReadFrom(buf); err == nil {
 			client := from.String()
-			log.Debugf("conn build from: %s", client)
+			log.Debugf(">>>>>>> package seqNo: %d", binary.BigEndian.Uint32(buf[:4]))
 
-			var s *session.SRTSession
-			v, ok := h.sessions.Load(client)
-			if !ok {
-				s = session.NewSRTSession(c, from, buf[:n])
-				h.sessions.Store(client, s)
-			} else {
-				s = v.(*session.SRTSession)
-				s.Data = buf[:n]
+			s := h.sessions[client]
+			if s == nil {
+				log.Infof("########## create session for %s", client)
+				s = session.NewSRTSession(conn, from)
+				h.sessions[client] = s
 			}
 
-			handler.Queue <- s
+			handler.Queue <- handler.NewBox(s, buf[:n])
 		} else {
 			//l.notifyReadError(errors.WithStack(err))
 			return

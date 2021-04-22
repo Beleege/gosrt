@@ -5,5 +5,5 @@ udp:
 
 srt:
   latency:
-    tx: 20
+    tx: 120
     rx: 20

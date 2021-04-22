@@ -46,6 +46,7 @@ func main() {
 			log.Errorf("srt server panic: ", r)
 			time.Sleep(1 * time.Second)
 		}
+		log.Infof("srt server stop")
 	}()
 
 	printBanner()

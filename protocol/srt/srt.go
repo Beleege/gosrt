@@ -3,6 +3,7 @@ package srt
 import (
 	"bytes"
 	"encoding/binary"
+	"github.com/beleege/gosrt/util/codec"
 	"time"
 )
 
@@ -21,7 +22,7 @@ const ()
 // |                                                               |
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
-// The structure of the SRT packet
+// Packet the SRT
 // 0                   1                   2                   3
 // 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 // +-+-+-+-+-+-+-+-+-+-+-+-+- SRT Header +-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -43,7 +44,7 @@ type Packet struct {
 	SocketID  uint32 // A fixed-width field providing the SRT socket ID to which a packet should be dispatched
 }
 
-// Data packet structure
+// DataPacket structure
 // 0                   1                   2                   3
 // 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 // +-+-+-+-+-+-+-+-+-+-+-+-+- SRT Header +-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -70,7 +71,7 @@ type DataPacket struct {
 	Content     []byte // The payload of the data packet
 }
 
-// Control packet structure
+// ControlPacket structure
 // 0                   1                   2                   3
 // 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 // +-+-+-+-+-+-+-+-+-+-+-+-+- SRT Header +-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -90,7 +91,7 @@ type ControlPacket struct {
 	Packet
 	CType    uint16 // Control Packet Type
 	Subtype  uint16 // This field specifies an additional subtype for specific packets
-	SpecInfo []byte // The use of this field depends on the particular control packet type
+	SpecInfo uint32 // The use of this field depends on the particular control packet type
 	CIF      []byte // The use of this field is defined by the Control Type field of the control packet
 }
 
@@ -122,7 +123,7 @@ func (cp *ControlPacket) Shutdown(t *time.Time, sid uint32) []byte {
 	return buf.Bytes()
 }
 
-// CIF of HandShake
+// HandShakeCIF
 // 0                   1                   2                   3
 // 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -176,7 +177,7 @@ type HSExtension struct {
 	EContent []byte // The payload of the extension, see HSExtTSBPD, HSExtStreamID etc
 }
 
-// SRT Extension (SRT_CMD_HSREQ & SRT_CMD_HSRSP)
+// HSExtTSBPD SRT Extension
 //  0                   1                   2                   3
 //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -194,64 +195,60 @@ type HSExtTSBPD struct {
 	RxDelay    uint16 // Delay of the Sender
 }
 
-// SRT Extension (Stream ID)
+// HSExtStreamID SRT Extension (Stream ID)
 type HSExtStreamID struct {
 	StreamID string
 }
 
 func ParseDPacket(b []byte) *DataPacket {
 	p := new(DataPacket)
-	p.SequenceNum = binary.BigEndian.Uint32(b[:4])
-	p.PP = (b[4] & 0xC0) >> 6
-	p.O = (b[4] & 0x20) > 0
-	p.KK = (b[4] & 0x18) >> 3
-	p.R = (b[4] & 0x04) > 0
-	mn := make([]byte, 0, 4)
-	mn = append(mn, b[4]&0x11, b[5], b[6], b[7])
-	p.MsgNum = binary.BigEndian.Uint32(mn)
-	p.Timestamp = binary.BigEndian.Uint32(b[8:12])
-	p.SocketID = binary.BigEndian.Uint32(b[12:16])
-	p.Content = b[16:]
+	b = codec.Decode32u(b, &p.SequenceNum)
+	p.PP = (b[0] & 0xC0) >> 6
+	p.O = (b[0] & 0x20) > 0
+	p.KK = (b[0] & 0x18) >> 3
+	p.R = (b[0] & 0x04) > 0
+	b = codec.Decode32u(b, &p.MsgNum)
+	p.MsgNum &= 0x11FFFFFF
+	b = codec.Decode32u(b, &p.Timestamp)
+	b = codec.Decode32u(b, &p.SocketID)
+	p.Content = b[:]
 	return p
 }
 
 func ParseCPacket(b []byte) *ControlPacket {
-	ct := make([]byte, 0, 2)
-	ct = append(ct, b[0]&0x7F, b[1])
 	p := new(ControlPacket)
-	p.CType = binary.BigEndian.Uint16(ct)
-	p.Subtype = binary.BigEndian.Uint16(b[2:4])
-	p.SpecInfo = b[4:8]
-	p.Timestamp = binary.BigEndian.Uint32(b[8:12])
-	p.SocketID = binary.BigEndian.Uint32(b[12:16])
-	p.CIF = b[16:]
+	b = codec.Decode16u(b, &p.CType)
+	p.CType &= 0x7FFF
+	b = codec.Decode16u(b, &p.Subtype)
+	b = codec.Decode32u(b, &p.SpecInfo)
+	b = codec.Decode32u(b, &p.Timestamp)
+	b = codec.Decode32u(b, &p.SocketID)
+	p.CIF = b[:]
 	return p
 }
 
 func ParseHCIF(b []byte) *HandShakeCIF {
 	h := new(HandShakeCIF)
-	h.Version = binary.BigEndian.Uint32(b[:4])
-	h.Encryption = binary.BigEndian.Uint16(b[4:6])
-	h.Extension = binary.BigEndian.Uint16(b[6:8])
-	h.InitSequenceNum = binary.BigEndian.Uint32(b[8:12])
-	h.MTU = binary.BigEndian.Uint32(b[12:16])
-	h.MFW = binary.BigEndian.Uint32(b[16:20])
-	h.HType = binary.BigEndian.Uint32(b[20:24])
-	h.SocketID = binary.BigEndian.Uint32(b[24:28])
-	h.Cookie = binary.BigEndian.Uint32(b[28:32])
-	h.PeerIP = b[32:48]
-	if len(b) > 48 {
-		h.HSExt = b[48:]
-	}
+	b = codec.Decode32u(b, &h.Version)
+	b = codec.Decode16u(b, &h.Encryption)
+	b = codec.Decode16u(b, &h.Extension)
+	b = codec.Decode32u(b, &h.InitSequenceNum)
+	b = codec.Decode32u(b, &h.MTU)
+	b = codec.Decode32u(b, &h.MFW)
+	b = codec.Decode32u(b, &h.HType)
+	b = codec.Decode32u(b, &h.SocketID)
+	b = codec.Decode32u(b, &h.Cookie)
+	h.PeerIP = b[:16]
+	h.HSExt = b[16:]
 	return h
 }
 
 func ParseHExtension(b []byte) *HSExtTSBPD {
 	h := new(HSExtTSBPD)
 	h.Bytes = b
-	h.SRTVersion = binary.BigEndian.Uint32(b[:4])
-	h.SRTFlags = binary.BigEndian.Uint32(b[4:8])
-	h.TxDelay = binary.BigEndian.Uint16(b[8:10])
-	h.RxDelay = binary.BigEndian.Uint16(b[10:12])
+	b = codec.Decode32u(b, &h.SRTVersion)
+	b = codec.Decode32u(b, &h.SRTFlags)
+	b = codec.Decode16u(b, &h.TxDelay)
+	b = codec.Decode16u(b, &h.RxDelay)
 	return h
 }

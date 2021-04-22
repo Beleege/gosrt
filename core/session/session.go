@@ -1,7 +1,7 @@
 package session
 
 import (
-	"encoding/binary"
+	"github.com/beleege/gosrt/util/codec"
 	"math/rand"
 	"net"
 	"strconv"
@@ -51,11 +51,10 @@ func (s *SRTSession) Write(b []byte) (n int, err error) {
 	return s.conn.WriteTo(b, s.peer)
 }
 
-func NewSRTSession(c net.PacketConn, a net.Addr, b []byte) *SRTSession {
+func NewSRTSession(c net.PacketConn, a net.Addr) *SRTSession {
 	s := new(SRTSession)
 	s.conn = c
 	s.peer = a
-	s.Data = b
 	s.OpenTime = time.Now()
 	s.ThisSID = rand.New(rand.NewSource(s.OpenTime.UnixNano())).Uint32()
 	s.Status = SNew
@@ -108,31 +107,25 @@ func (s *SRTSession) parseHSExtension(b []byte) {
 		case srt.HSExtTypeHSReq:
 			fallthrough
 		case srt.HSExtTypeHSRsp:
-			s.TSBPD = srt.ParseHExtension(ext.EContent[4:])
+			s.TSBPD = srt.ParseHExtension(ext.EContent)
 		case srt.HSExtTypeSID:
-			s.StreamID = string(ext.EContent[4:])
+			s.StreamID = string(ext.EContent)
 		}
 	}
 }
 
 func parseMultiExt(b []byte) []*srt.HSExtension {
 	exts := make([]*srt.HSExtension, 0, 2)
-	idx := 0
-	size := len(b)
-	for idx < size {
+	for len(b) > 0 {
 		hse := new(srt.HSExtension)
 
-		hse.EType = binary.BigEndian.Uint16(b[idx : idx+2])
-		idx = idx + 2
+		b = codec.Decode16u(b, &hse.EType)
+		b = codec.Decode16u(b, &hse.ELength)
+		l := int(hse.ELength) * 4
+		hse.EContent = b[:l]
+		b = b[l:]
 
-		hse.ELength = binary.BigEndian.Uint16(b[idx : idx+2])
-		idx = idx + 2
-		end := idx + int(hse.ELength)*4
-
-		hse.EContent = b[idx:end]
 		exts = append(exts, hse)
-
-		idx = end
 	}
 	return exts
 }

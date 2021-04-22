@@ -11,14 +11,14 @@ import (
 var params = struct {
 	LogLevel string `default:"info" env:"Loglevel"`
 	LogFile  string `default:"/tmp/debug.log" env:"LogFile"`
-	PoolSize int    `default:"4"`
+	PoolSize int    `default:"10"`
 	UDP      struct {
 		IP   string `default:"127.0.0.1"`
 		Port int    `default:"9090"`
 	}
 	SRT struct {
 		Latency struct {
-			TX uint16 `default:"20"`
+			TX uint16 `default:"120"`
 			RX uint16 `default:"20"`
 		}
 	}

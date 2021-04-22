@@ -24,13 +24,13 @@ func (h *shutdown) next(next srtHandler) {
 	h.nextHandler = next
 }
 
-func (h *shutdown) execute(s *session.SRTSession) error {
-	if s.CP != nil && s.CP.CType == srt.CTShutdown {
-		log.Infof("stream[%s] session shutdown", s.StreamID)
-		s.Status = session.SShutdown
+func (h *shutdown) execute(box *Box) error {
+	if box.s.CP != nil && box.s.CP.CType == srt.CTShutdown {
+		log.Infof("stream[%s] session shutdown", box.s.StreamID)
+		box.s.Status = session.SShutdown
 		return nil
 	} else if h.hasNext() {
-		return h.nextHandler.execute(s)
+		return h.nextHandler.execute(box)
 	}
 	return errors.New("no handler after shutdown")
 }

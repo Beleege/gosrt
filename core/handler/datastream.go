@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/binary"
 	"sync"
 
 	"github.com/beleege/gosrt/core/session"
@@ -28,27 +29,27 @@ func (d *dataStream) next(next srtHandler) {
 	d.nextHandler = next
 }
 
-func (d *dataStream) execute(s *session.SRTSession) error {
-	if s.DP != nil {
+func (d *dataStream) execute(box *Box) error {
+	if box.s.DP != nil {
 		var q []*srt.DataPacket
-		v, ok := _queueMap.Load(s.GetPeer())
+		v, ok := _queueMap.Load(box.s.GetPeer())
 		if !ok {
-			q = make([]*srt.DataPacket, 0, s.MFW)
+			q = make([]*srt.DataPacket, 0, box.s.MFW)
 		} else {
 			q = v.([]*srt.DataPacket)
 		}
 
-		q = append(q, s.DP)
-		_queueMap.Store(s.GetPeer(), q)
-		log.Infof("received data in queue[%d] addrt: %p", len(q), &q)
-		if len(q)%50 == 0 {
-			return ack(s, q)
-		} else if len(q) >= int(s.MFW) {
-			q = q[0:0]
-		}
+		q = append(q, box.s.DP)
+		_queueMap.Store(box.s.GetPeer(), q)
+		log.Infof("received data in queue[%d] with seqNo: %d", len(q), binary.BigEndian.Uint32(box.b[:4]))
+		//if len(q)%24 == 0 {
+		//	return ack(s, q)
+		//} else if len(q) >= int(s.MFW) {
+		//	q = q[0:0]
+		//}
 		return nil
 	} else if d.hasNext() {
-		return d.nextHandler.execute(s)
+		return d.nextHandler.execute(box)
 	}
 
 	return errors.New("no handler after dataStream")

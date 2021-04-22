@@ -14,7 +14,7 @@ func InitLog() {
 	if err != nil {
 		panic(err)
 	}
-	formatter := logger.TextFormatter{FullTimestamp: true, TimestampFormat: "2006-01-02 15:04:05.999"}
+	formatter := logger.TextFormatter{FullTimestamp: true, TimestampFormat: "2006-01-02 15:04:05.999999"}
 	l = &logger.Logger{
 		Out:       os.Stdout,
 		Formatter: &formatter,

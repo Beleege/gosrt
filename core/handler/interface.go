@@ -11,30 +11,42 @@ import (
 	"github.com/beleege/gosrt/util/pool"
 )
 
-var Queue = make(chan *session.SRTSession)
+type Box struct {
+	s *session.SRTSession
+	b []byte
+}
+
+func NewBox(s *session.SRTSession, b []byte) *Box {
+	box := new(Box)
+	box.s = s
+	box.b = b
+	return box
+}
+
+var Queue = make(chan *Box, 1024)
 
 var taskPool *pool.Pool
 
 type srtHandler interface {
 	hasNext() bool
 	next(h srtHandler)
-	execute(s *session.SRTSession) error
+	execute(s *Box) error
 }
 
 type srtContext struct {
-	h srtHandler
-	s *session.SRTSession
+	handler srtHandler
+	box     *Box
 }
 
 func (c *srtContext) GetID() string {
-	return strconv.Itoa(int(c.s.ThatSID))
+	return strconv.Itoa(int(c.box.s.ThatSID))
 }
 
 func (c *srtContext) GetTask() pool.Task {
 	return func(args ...interface{}) error {
-		if err := c.h.execute(c.s); err != nil {
+		if err := c.handler.execute(c.box); err != nil {
 			log.Errorf("handle session fail: %s", err.Error())
-			closeConnect(c.s)
+			closeConnect(c.box)
 		}
 		return nil
 	}
@@ -45,8 +57,8 @@ func Task() {
 	defer taskPool.Clear()
 
 	chain := wrap()
-	for s := range Queue {
-		ctx := &srtContext{h: chain, s: s}
+	for box := range Queue {
+		ctx := &srtContext{handler: chain, box: box}
 		if err := taskPool.Execute(ctx); err != nil {
 			log.Errorf("task execute fail: %s", err.Error())
 			taskPool.Remove(ctx.GetID())
@@ -73,14 +85,15 @@ func selectHandlers() []srtHandler {
 	return list
 }
 
-func closeConnect(s *session.SRTSession) {
+func closeConnect(box *Box) {
+	s := box.s
 	if s.Status == session.SShutdown {
 		return
 	}
 	p := new(srt.ControlPacket)
 	p.CType = srt.CTShutdown
 	p.Subtype = uint16(0)
-	p.SpecInfo = []byte{0x00, 0x00, 0x00, 0x00}
+	p.SpecInfo = 0
 	p.Timestamp = uint32(time.Now().UnixNano() - s.OpenTime.UnixNano())
 	p.SocketID = s.ThatSID
 
