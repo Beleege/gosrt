@@ -38,7 +38,7 @@ func (d *decoder) execute(box *Box) error {
 			box.s.CP = pkg
 		}
 	} else if t == srt.PTypeData {
-		if box.s.Status != session.SConnect {
+		if box.s.Status.Load().(int) != session.SConnect {
 			// TODO clear session
 			return errors.Errorf("session is not connected")
 		}

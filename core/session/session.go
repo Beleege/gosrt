@@ -1,11 +1,14 @@
 package session
 
 import (
+	"container/list"
 	"github.com/beleege/gosrt/util/codec"
+	"github.com/beleege/gosrt/util/window"
 	"math/rand"
 	"net"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/beleege/gosrt/protocol/srt"
@@ -22,10 +25,14 @@ const (
 	SShutdown  = 0xFFFFFFFF
 )
 
+type ACKAction func(s *SRTSession, seq uint32)
+
 type SRTSession struct {
 	conn     net.PacketConn
 	peer     net.Addr
 	OpenTime time.Time
+	RecWin   *window.Entity
+	ActList  *list.List
 	ACKNo    uint32
 	ACKTime  uint32
 	RTTTime  uint32
@@ -43,8 +50,7 @@ type SRTSession struct {
 	Cookie   uint32
 	StreamID string
 	TSBPD    *srt.HSExtTSBPD
-	// TODO condition compete
-	Status uint32
+	Status   atomic.Value
 }
 
 func (s *SRTSession) Write(b []byte) (n int, err error) {
@@ -56,9 +62,26 @@ func NewSRTSession(c net.PacketConn, a net.Addr) *SRTSession {
 	s.conn = c
 	s.peer = a
 	s.OpenTime = time.Now()
+	s.RecWin = window.New(1024, func(seq uint32) {
+		if s.ActList.Len() > 0 {
+			e := s.ActList.Front()
+			if f, ok := e.Value.(ACKAction); ok {
+				f(s, seq)
+			}
+			// clear action list
+			s.ActList.Init()
+		}
+	})
+	s.ActList = list.New()
 	s.ThisSID = rand.New(rand.NewSource(s.OpenTime.UnixNano())).Uint32()
-	s.Status = SNew
+	s.Status.Store(SNew)
 	return s
+}
+
+func (s *SRTSession) AddACKAction(f ACKAction) {
+	if f != nil {
+		s.ActList.PushBack(f)
+	}
 }
 
 func (s *SRTSession) SetDP(pkg *srt.DataPacket) {
@@ -75,16 +98,16 @@ func (s *SRTSession) SetCP(pkg *srt.ControlPacket, cif *srt.HandShakeCIF) {
 		s.MFW = cif.MFW
 		s.ThatSID = cif.SocketID
 		if cif.HType == srt.HSTypeInduction {
-			s.Status = SOpen
+			s.Status.Store(SOpen)
 		}
 	} else if cif.Version == srt.HSv5 {
 		if cif.Cookie != s.Cookie {
 			log.Errorf("cookie[%d] is not match", cif.Cookie)
-			s.Status = SIllegal
+			s.Status.Store(SIllegal)
 			return
 		}
 		if cif.HType == srt.HSTypeConclusion {
-			s.Status = SRepeat
+			s.Status.Store(SRepeat)
 			s.ACKTime = uint32(time.Now().Unix())
 		}
 	}

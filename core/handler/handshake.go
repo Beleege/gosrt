@@ -30,14 +30,15 @@ func (h *handshake) next(next srtHandler) {
 }
 
 func (h *handshake) execute(box *Box) error {
-	if box.s.CP != nil && box.s.CP.CType == srt.CTHandShake && box.s.Status != session.SConnect {
-		if box.s.Status == session.SOpen {
+	ss := box.s.Status.Load().(int)
+	if box.s.CP != nil && box.s.CP.CType == srt.CTHandShake && ss != session.SConnect {
+		if ss == session.SOpen {
 			return responseAndSetCookie(box)
-		} else if box.s.Status == session.SRepeat {
+		} else if ss == session.SRepeat {
 			return establishConnection(box)
 		} else {
-			log.Infof("illegal handshake status: %d", box.s.Status)
-			box.s.Status = session.SShutdown
+			log.Infof("illegal handshake status: %d", box.s.Status.Load().(int))
+			box.s.Status.Store(session.SShutdown)
 			return errors.Errorf("handshake fail")
 		}
 	} else if h.hasNext() {
@@ -70,7 +71,7 @@ func responseAndSetCookie(box *Box) error {
 	if _, err = box.s.Write(box.b[:64]); err != nil {
 		return err
 	}
-	box.s.Status = session.SSetCookie
+	box.s.Status.Store(session.SSetCookie)
 	return nil
 }
 
@@ -105,6 +106,6 @@ func establishConnection(box *Box) error {
 	if _, err = box.s.Write(box.b[:80]); err != nil {
 		return err
 	}
-	box.s.Status = session.SConnect
+	box.s.Status.Store(session.SConnect)
 	return nil
 }

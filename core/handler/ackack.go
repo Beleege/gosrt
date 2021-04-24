@@ -27,7 +27,7 @@ func (d *ackack) next(next srtHandler) {
 }
 
 func (d *ackack) execute(box *Box) error {
-	if box.s.CP != nil && box.s.CP.CType == srt.CTAckAck && box.s.Status == session.SConnect {
+	if box.s.CP != nil && box.s.CP.CType == srt.CTAckAck && box.s.Status.Load().(int) == session.SConnect {
 		box.s.ACKNo = box.s.CP.SpecInfo + 1
 		rtt := (uint32(time.Now().Unix()) - box.s.ACKTime) << 1
 		box.s.RTTDiff = rtt - box.s.RTTTime

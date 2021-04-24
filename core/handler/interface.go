@@ -87,7 +87,7 @@ func selectHandlers() []srtHandler {
 
 func closeConnect(box *Box) {
 	s := box.s
-	if s.Status == session.SShutdown {
+	if s.Status.Load().(int) == session.SShutdown {
 		return
 	}
 	p := new(srt.ControlPacket)

@@ -27,7 +27,7 @@ func (h *shutdown) next(next srtHandler) {
 func (h *shutdown) execute(box *Box) error {
 	if box.s.CP != nil && box.s.CP.CType == srt.CTShutdown {
 		log.Infof("stream[%s] session shutdown", box.s.StreamID)
-		box.s.Status = session.SShutdown
+		box.s.Status.Store(session.SShutdown)
 		return nil
 	} else if h.hasNext() {
 		return h.nextHandler.execute(box)

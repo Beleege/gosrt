@@ -12,7 +12,7 @@ import (
 
 type NoLossAction func(seq uint32)
 
-type underlay struct {
+type Entity struct {
 	// update lock
 	mu sync.Mutex
 	// drop task condition
@@ -60,8 +60,8 @@ type LossRange struct {
 	End   uint32
 }
 
-func NewWindow(size int, act NoLossAction) *underlay {
-	p := new(underlay)
+func New(size int, act NoLossAction) *Entity {
+	p := new(Entity)
 	p.size = size
 	p.list = make([]node, size*2)
 	p.dirty = p.list[:]
@@ -79,19 +79,19 @@ func NewWindow(size int, act NoLossAction) *underlay {
 	return p
 }
 
-func (u *underlay) TS() int64 {
+func (u *Entity) TS() int64 {
 	return u.ts
 }
 
-func (u *underlay) ListenLoss() chan []LossRange {
+func (u *Entity) ListenLoss() chan []LossRange {
 	return u.lossChan
 }
 
-func (u *underlay) ListenBatch() chan []*srt.DataPacket {
+func (u *Entity) ListenBatch() chan []*srt.DataPacket {
 	return u.batchChan
 }
 
-func (u *underlay) Append(p *srt.DataPacket) bool {
+func (u *Entity) Append(p *srt.DataPacket) bool {
 	now := time.Now().Unix()
 	u.cond.L.Lock()
 	defer u.cond.L.Unlock()
@@ -147,14 +147,18 @@ func (u *underlay) Append(p *srt.DataPacket) bool {
 	return true
 }
 
-func (u *underlay) IsFull() bool {
+func (u *Entity) IsFull() bool {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
 	return u.used == u.size && len(u.dict) == 0
 }
 
-func (u *underlay) Loss() []LossRange {
+func (u *Entity) Len() uint32 {
+	return uint32(len(u.dirty))
+}
+
+func (u *Entity) Loss() []LossRange {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
@@ -185,7 +189,7 @@ func (u *underlay) Loss() []LossRange {
 }
 
 // warn: need lock protect
-func (u *underlay) reset() {
+func (u *Entity) reset() {
 	u.ts = 0
 	u.first = 0
 	u.dirty = u.list[:]
@@ -200,7 +204,7 @@ func (u *underlay) reset() {
 	}
 }
 
-func (u *underlay) lossMonitor() {
+func (u *Entity) lossMonitor() {
 	if !atomic.CompareAndSwapInt32(&u.lossMon, 0, 1) {
 		return
 	}
@@ -224,7 +228,7 @@ func (u *underlay) lossMonitor() {
 	}
 }
 
-func (u *underlay) onPkgAdd() {
+func (u *Entity) onPkgAdd() {
 	timer := time.NewTimer(10 * time.Millisecond)
 
 	for {
