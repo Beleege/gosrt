@@ -270,7 +270,9 @@ func (u *Entity) onPkgAdd() {
 
 			arr := make([]*srt.DataPacket, 0, len(u.dirty))
 			for i := range u.dirty {
-				arr = append(arr, u.dirty[i].pkg)
+				if u.dirty[i].pkg != nil {
+					arr = append(arr, u.dirty[i].pkg)
+				}
 			}
 			if len(arr) > 0 {
 				u.batchChan <- arr

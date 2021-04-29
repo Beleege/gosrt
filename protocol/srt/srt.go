@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-const ()
-
 // SRT packets are transmitted as UDP payload
 // 0                   1                   2                   3
 // 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1

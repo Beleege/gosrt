@@ -5,7 +5,6 @@ import (
 
 	"github.com/beleege/gosrt/core/session"
 	"github.com/beleege/gosrt/protocol/srt"
-	"github.com/beleege/gosrt/util/log"
 	"github.com/pkg/errors"
 )
 
@@ -32,7 +31,7 @@ func (d *ackack) execute(box *Box) error {
 		rtt := (uint32(time.Now().Unix()) - box.s.ACKTime) << 1
 		box.s.RTTDiff = rtt - box.s.RTTTime
 		box.s.RTTTime = rtt
-		log.Infof("cal new rtt[%d], rttdiff[%d] in ackNo[%d]", box.s.RTTTime, box.s.RTTDiff, box.s.ACKNo-1)
+		//log.Infof("cal new rtt[%d], rttdiff[%d] in ackNo[%d]", box.s.RTTTime, box.s.RTTDiff, box.s.ACKNo-1)
 		box.s.CP = nil
 		return nil
 	} else if d.hasNext() {

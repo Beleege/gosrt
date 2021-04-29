@@ -22,6 +22,11 @@ var params = struct {
 			RX uint16 `default:"20"`
 		}
 	}
+	HLS struct {
+		Server struct {
+			Port int `default:"9091"`
+		}
+	}
 }{}
 
 func InitConfig() {
@@ -40,6 +45,10 @@ func GetLogLevel() string {
 
 func GetUDPAddr() string {
 	return fmt.Sprintf("%s:%d", params.UDP.IP, params.UDP.Port)
+}
+
+func GetHLSPort() int {
+	return params.HLS.Server.Port
 }
 
 func GetPoolSize() int {

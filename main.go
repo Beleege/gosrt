@@ -14,6 +14,8 @@ const (
 	version = "0.1"
 )
 
+var ShutDownSignal = make(chan error)
+
 func printBanner() {
 	logger.Println(fmt.Sprintf(`
 ===============================================
@@ -37,7 +39,9 @@ func preInit() {
 }
 
 func serverInit() {
-	server.SetupUDPServer()
+	go server.SetupUDPServer()
+	// here need programmatically setup media server
+	go server.SetupHLSServer()
 }
 
 func main() {
@@ -53,4 +57,11 @@ func main() {
 	loadResource()
 	preInit()
 	serverInit()
+
+	select {
+	case err := <-ShutDownSignal:
+		if err != nil {
+			panic(err)
+		}
+	}
 }

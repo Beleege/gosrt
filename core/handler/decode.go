@@ -3,7 +3,6 @@ package handler
 import (
 	"github.com/beleege/gosrt/core/session"
 	"github.com/beleege/gosrt/protocol/srt"
-	"github.com/beleege/gosrt/util/log"
 	"github.com/pkg/errors"
 )
 
@@ -30,7 +29,7 @@ func (d *decoder) execute(box *Box) error {
 		//log.Debugf("-----------------------------------------------")
 		//log.Debugf("binary data:\n%s", hex.Dump(s.Data))
 		pkg := srt.ParseCPacket(box.b)
-		log.Debugf("control pkg type is %d", pkg.CType)
+		//log.Debugf("control pkg type is %d", pkg.CType)
 		if pkg.CType == srt.CTHandShake {
 			cif := srt.ParseHCIF(pkg.CIF)
 			box.s.SetCP(pkg, cif)
