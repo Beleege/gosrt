@@ -20,14 +20,14 @@ var (
 
 func Select(conn net.PacketConn) {
 	_sessions = make(map[string]*session.SRTSession)
-	_pool = &sync.Pool{New: newBuf}
+	//_pool = &sync.Pool{New: newBuf}
 
 	defer func() {
 		close(handler.Queue)
 	}()
 
 	for {
-		buf := _pool.Get().([]byte)
+		buf := make([]byte, _mtuLimit)
 		if n, from, err := conn.ReadFrom(buf); err == nil {
 			client := from.String()
 

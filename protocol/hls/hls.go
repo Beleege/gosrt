@@ -55,7 +55,7 @@ func (tcCacheItem *TSCache) GetPlayList() ([]byte, error) {
 	w := bytes.NewBuffer(nil)
 	_, _ = fmt.Fprintf(w,
 		"#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-ALLOW-CACHE:NO\n#EXT-X-TARGETDURATION:%d\n#EXT-X-MEDIA-SEQUENCE:%d\n\n",
-		int(maxDuration)+1, seq)
+		int(maxDuration), seq)
 	w.Write(m3u8body.Bytes())
 	return w.Bytes(), nil
 }

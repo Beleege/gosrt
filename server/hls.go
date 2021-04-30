@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"path"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/beleege/gosrt/config"
@@ -68,7 +67,7 @@ func handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p := strings.TrimLeft(r.URL.Path, "/")
+	//p := strings.TrimLeft(r.URL.Path, "/")
 
 	switch path.Ext(r.URL.Path) {
 	case ".m3u8":
@@ -79,16 +78,17 @@ func handle(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		log.Debugf("************ playlist: %s", string(playlist))
+		log.Debugf("************ playlist: \n%s", string(playlist))
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Content-Type", "application/x-mpegURL")
 		w.Header().Set("Content-Length", strconv.Itoa(len(playlist)))
 		_, _ = w.Write(playlist)
 	case ".ts":
-		paths := strings.SplitN(p, "/", 3)
-		key := paths[0] + "/" + paths[1]
-		item, err := _tsCache.GetItem(key)
+		//paths := strings.SplitN(p, "/", 3)
+		//key := paths[0] + "/" + paths[1]
+		item, err := _tsCache.GetItem(r.URL.Path)
+		log.Debugf("************ request ts with path: %s", r.URL.Path)
 		if err != nil {
 			log.Debugf("get ts item error: %s", err.Error())
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -97,6 +97,7 @@ func handle(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Content-Type", "video/mp2ts")
 		w.Header().Set("Content-Length", strconv.Itoa(len(item.Data)))
+		_, _ = w.Write(item.Data)
 	}
 }
 
@@ -114,7 +115,9 @@ func onData(ch chan []*srt.DataPacket) {
 							first = d
 						} else if d-first > _maxTSDuration && tsBuf != nil {
 							// build ts item FIXME replace 'test'
-							key := fmt.Sprintf("/%s/%d.ts", "test", time.Now().Unix())
+							tt := time.Now().Unix()
+							key := fmt.Sprintf("/%s/%d.ts", "test", tt)
+							log.Infof("############# save item with key: %s", key)
 							_tsCache.SetItem(key, data[i].SequenceNum, d-first, tsBuf.Bytes())
 							first = d
 							tsBuf = bytes.NewBuffer(nil)
@@ -123,11 +126,11 @@ func onData(ch chan []*srt.DataPacket) {
 					if tsBuf == nil {
 						tsBuf = bytes.NewBuffer(nil)
 					}
-					tsBuf.Write(data[i].Content)
+					tsBuf.Write(b)
 				}
 			}
 			// reduce gc press
-			selector.Recycle(data[i].Content)
+			//selector.Recycle(data[i].Content)
 			data[i].Content = nil
 		}
 	}
